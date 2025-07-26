@@ -214,68 +214,23 @@
             margin: 5px 0;
         }
         
-        #startupPanel {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
+        #fileInput {
+            display: none;
         }
         
-        #startupContent {
-            background-color: var(--secondary-color);
-            padding: 30px;
-            border-radius: 8px;
-            max-width: 500px;
-            text-align: center;
-        }
-        
-        #startupButtons {
-            margin-top: 20px;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-        }
-        
-        .startup-button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        
-        #downloadBtn {
-            background-color: var(--primary-color);
-            color: white;
-        }
-        
-        #closeBtn {
-            background-color: #e0e0e0;
-            color: var(--text-color);
+        #directoryInput {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div id="startupPanel">
-        <div id="startupContent">
-            <h2>Welcome to ExArchive</h2>
-            <p>Please install the full version for complete functionality.</p>
-            <div id="startupButtons">
-                <button class="startup-button" id="downloadBtn">Download</button>
-                <button class="startup-button" id="closeBtn">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="app" style="display: none;">
+    <div id="app">
+        <input type="file" id="fileInput" multiple>
+        <input type="file" id="directoryInput" webkitdirectory directory multiple>
+        
         <div class="toolbar">
-            <button class="toolbar-button" id="openBtn">Open</button>
+            <button class="toolbar-button" id="openBtn">Open File</button>
+            <button class="toolbar-button" id="openDirBtn">Open Folder</button>
             <button class="toolbar-button" id="extractBtn">Extract</button>
             <button class="toolbar-button" id="devBtn">Developers</button>
         </div>
@@ -324,7 +279,7 @@
     <div id="contextMenu" class="context-menu">
         <div class="context-menu-item" id="openContextItem">Open</div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" id="deleteContextItem">Delete</div>
+        <div class="context-menu-item" id="downloadContextItem">Download</div>
         <div class="context-menu-item" id="renameContextItem">Rename</div>
         <div class="context-menu-item" id="copyPathContextItem">Copy Path</div>
         <div class="context-menu-separator"></div>
@@ -336,22 +291,11 @@
         let currentScale = 1.0;
         let fileTreeData = [];
         let selectedTreeNode = null;
+        let openedFiles = {};
         
         document.addEventListener('DOMContentLoaded', () => {
-            const startupPanel = document.getElementById('startupPanel');
-            const downloadBtn = document.getElementById('downloadBtn');
-            const closeBtn = document.getElementById('closeBtn');
-            
-            downloadBtn.addEventListener('click', () => {
-                window.open('index.html', '_blank');
-            });
-            
-            closeBtn.addEventListener('click', () => {
-                startupPanel.style.display = 'none';
-                document.getElementById('app').style.display = 'flex';
-            });
-            
             const openBtn = document.getElementById('openBtn');
+            const openDirBtn = document.getElementById('openDirBtn');
             const extractBtn = document.getElementById('extractBtn');
             const devBtn = document.getElementById('devBtn');
             const zoomInBtn = document.getElementById('zoomInBtn');
@@ -361,35 +305,37 @@
             const imageDisplay = document.getElementById('imageDisplay');
             const statusBar = document.getElementById('statusBar');
             const fileTree = document.getElementById('fileTree');
+            const fileInput = document.getElementById('fileInput');
+            const directoryInput = document.getElementById('directoryInput');
             
             const contextMenu = document.getElementById('contextMenu');
             const openContextItem = document.getElementById('openContextItem');
-            const deleteContextItem = document.getElementById('deleteContextItem');
+            const downloadContextItem = document.getElementById('downloadContextItem');
             const renameContextItem = document.getElementById('renameContextItem');
             const copyPathContextItem = document.getElementById('copyPathContextItem');
             const propertiesContextItem = document.getElementById('propertiesContextItem');
             
-            openBtn.addEventListener('click', handleOpenFile);
+            openBtn.addEventListener('click', () => fileInput.click());
+            openDirBtn.addEventListener('click', () => directoryInput.click());
             extractBtn.addEventListener('click', handleExtractFile);
             devBtn.addEventListener('click', showDevelopersPanel);
             zoomInBtn.addEventListener('click', () => zoomImage(1.25));
             zoomOutBtn.addEventListener('click', () => zoomImage(0.8));
             resetZoomBtn.addEventListener('click', resetZoom);
             
+            fileInput.addEventListener('change', handleFileSelect);
+            directoryInput.addEventListener('change', handleDirectorySelect);
+            
             openContextItem.addEventListener('click', () => {
                 if (currentFile) {
-                    window.open(currentFile.path, '_blank');
+                    openFile(currentFile);
                 }
                 contextMenu.style.display = 'none';
             });
             
-            deleteContextItem.addEventListener('click', () => {
+            downloadContextItem.addEventListener('click', () => {
                 if (currentFile) {
-                    const confirmDelete = confirm(`Are you sure you want to delete "${currentFile.name}"?`);
-                    if (confirmDelete) {
-                        statusBar.textContent = `File deleted: ${currentFile.name}`;
-                        updateFileTree(currentFile.parentDirectory);
-                    }
+                    downloadFile(currentFile);
                 }
                 contextMenu.style.display = 'none';
             });
@@ -399,7 +345,8 @@
                     const newName = prompt('Enter new name:', currentFile.name);
                     if (newName && newName.trim() !== '') {
                         statusBar.textContent = `File renamed to: ${newName}`;
-                        updateFileTree(currentFile.parentDirectory);
+                        currentFile.name = newName;
+                        updateFileTree();
                     }
                 }
                 contextMenu.style.display = 'none';
@@ -407,12 +354,12 @@
             
             copyPathContextItem.addEventListener('click', () => {
                 if (currentFile) {
-                    navigator.clipboard.writeText(currentFile.path)
+                    navigator.clipboard.writeText(currentFile.name)
                         .then(() => {
-                            statusBar.textContent = 'Path copied to clipboard';
+                            statusBar.textContent = 'File name copied to clipboard';
                         })
                         .catch(err => {
-                            statusBar.textContent = 'Failed to copy path';
+                            statusBar.textContent = 'Failed to copy file name';
                         });
                 }
                 contextMenu.style.display = 'none';
@@ -446,31 +393,68 @@
             renderFileTree([]);
         });
         
-        function handleOpenFile() {
-            const mockFile = {
-                id: 'file1',
-                name: 'example.txt',
-                path: '/path/to/example.txt',
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length === 0) return;
+            
+            fileTreeData = Array.from(files).map((file, index) => ({
+                id: 'file_' + index,
+                name: file.name,
+                file: file,
                 isDirectory: false,
-                parentDirectory: '/path/to',
-                size: 1024,
-                modified: new Date(),
-                type: 'text/plain'
-            };
+                size: file.size,
+                type: file.type,
+                lastModified: file.lastModified
+            }));
             
-            currentFile = mockFile;
-            updateFileTree('/path/to');
-            statusBar.textContent = `Opened: ${mockFile.name}`;
+            updateFileTree();
+            statusBar.textContent = `Opened ${files.length} file(s)`;
+        }
+        
+        function handleDirectorySelect(event) {
+            const files = event.target.files;
+            if (files.length === 0) return;
             
-            if (isTextFile(mockFile)) {
-                showTextContent('This is example text content.\n\nYou would see the actual file content here in a real application.');
-            } else if (isImageFile(mockFile)) {
-                showImage('https://via.placeholder.com/600x400?text=Example+Image');
-            } else if (isVideoFile(mockFile)) {
-                showVideo('/path/to/example.mp4');
-            } else {
-                showTextContent(`Binary file: ${mockFile.name}\nSize: ${mockFile.size} bytes`);
-            }
+            const fileMap = {};
+            
+            Array.from(files).forEach(file => {
+                const path = file.webkitRelativePath;
+                const parts = path.split('/');
+                let currentPath = '';
+                
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    const isFile = i === parts.length - 1;
+                    const fullPath = currentPath ? `${currentPath}/${part}` : part;
+                    
+                    if (!fileMap[fullPath]) {
+                        fileMap[fullPath] = {
+                            id: 'item_' + fullPath.replace(/\//g, '_'),
+                            name: part,
+                            path: fullPath,
+                            isDirectory: !isFile,
+                            children: []
+                        };
+                        
+                        if (isFile) {
+                            fileMap[fullPath].file = file;
+                            fileMap[fullPath].size = file.size;
+                            fileMap[fullPath].type = file.type;
+                            fileMap[fullPath].lastModified = file.lastModified;
+                        }
+                        
+                        if (currentPath && fileMap[currentPath]) {
+                            fileMap[currentPath].children.push(fileMap[fullPath]);
+                        }
+                    }
+                    
+                    currentPath = fullPath;
+                }
+            });
+            
+            fileTreeData = Object.values(fileMap).filter(item => !item.path.includes('/'));
+            updateFileTree();
+            statusBar.textContent = `Opened directory with ${files.length} items`;
         }
         
         function handleExtractFile() {
@@ -479,7 +463,7 @@
                 return;
             }
             
-            statusBar.textContent = `Extracted ${currentFile.name} to selected directory`;
+            statusBar.textContent = `Extracted ${currentFile.name} (simulated)`;
         }
         
         function showDevelopersPanel() {
@@ -497,42 +481,83 @@
             document.getElementById('developersArea').style.display = 'none';
         }
         
-        function showImage(imageSrc) {
+        function showImage(file) {
             const imageDisplay = document.getElementById('imageDisplay');
-            imageDisplay.src = imageSrc;
-            currentScale = 1.0;
-            imageDisplay.style.transform = `scale(${currentScale})`;
+            const reader = new FileReader();
             
-            document.getElementById('contentArea').style.display = 'none';
-            document.getElementById('imageArea').style.display = 'flex';
-            document.getElementById('videoArea').style.display = 'none';
-            document.getElementById('developersArea').style.display = 'none';
+            reader.onload = function(e) {
+                imageDisplay.src = e.target.result;
+                currentScale = 1.0;
+                imageDisplay.style.transform = `scale(${currentScale})`;
+                
+                document.getElementById('contentArea').style.display = 'none';
+                document.getElementById('imageArea').style.display = 'flex';
+                document.getElementById('videoArea').style.display = 'none';
+                document.getElementById('developersArea').style.display = 'none';
+            };
+            
+            reader.readAsDataURL(file);
         }
         
-        function showVideo(videoSrc) {
+        function showVideo(file) {
             const videoContainer = document.getElementById('videoContainer');
-            videoContainer.innerHTML = `
-                <div style="text-align: center; margin-bottom: 20px;">
-                    Playing: ${currentFile ? currentFile.name : 'video'}
-                </div>
-                <div style="text-align: center;">
-                    <button onclick="playVideo('${videoSrc}')" style="padding: 10px 20px; background-color: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer;">
-                        Play Video
-                    </button>
-                </div>
-                <div style="text-align: center; margin-top: 20px; color: #666;">
-                    Note: This demo would play the video in a real application
-                </div>
-            `;
+            const reader = new FileReader();
             
-            document.getElementById('contentArea').style.display = 'none';
-            document.getElementById('imageArea').style.display = 'none';
-            document.getElementById('videoArea').style.display = 'block';
-            document.getElementById('developersArea').style.display = 'none';
+            reader.onload = function(e) {
+                videoContainer.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        Playing: ${file.name}
+                    </div>
+                    <div style="text-align: center;">
+                        <video controls style="max-width: 100%; max-height: 400px;">
+                            <source src="${e.target.result}" type="${file.type}">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                `;
+                
+                document.getElementById('contentArea').style.display = 'none';
+                document.getElementById('imageArea').style.display = 'none';
+                document.getElementById('videoArea').style.display = 'block';
+                document.getElementById('developersArea').style.display = 'none';
+            };
+            
+            reader.readAsDataURL(file);
         }
         
-        function playVideo(videoSrc) {
-            alert(`Would play video: ${videoSrc}\nIn a real app, this would open the video player.`);
+        function openFile(file) {
+            if (file.isDirectory) {
+                updateFileTree();
+                return;
+            }
+            
+            if (isTextFile(file)) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    showTextContent(e.target.result);
+                };
+                reader.readAsText(file.file);
+            } else if (isImageFile(file)) {
+                showImage(file.file);
+            } else if (isVideoFile(file)) {
+                showVideo(file.file);
+            } else {
+                showTextContent(`Binary file: ${file.name}\nSize: ${formatFileSize(file.size)}`);
+            }
+        }
+        
+        function downloadFile(file) {
+            if (!file.file) return;
+            
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(file.file);
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+            
+            statusBar.textContent = `Downloading ${file.name}`;
         }
         
         function zoomImage(factor) {
@@ -545,42 +570,8 @@
             document.getElementById('imageDisplay').style.transform = `scale(${currentScale})`;
         }
         
-        function updateFileTree(directoryPath) {
-            const mockFiles = [
-                {
-                    id: 'file1',
-                    name: 'Documents',
-                    path: `${directoryPath}/Documents`,
-                    isDirectory: true,
-                    parentDirectory: directoryPath,
-                    size: 0,
-                    modified: new Date(),
-                    type: 'directory'
-                },
-                {
-                    id: 'file2',
-                    name: 'example.txt',
-                    path: `${directoryPath}/example.txt`,
-                    isDirectory: false,
-                    parentDirectory: directoryPath,
-                    size: 1024,
-                    modified: new Date(),
-                    type: 'text/plain'
-                },
-                {
-                    id: 'file3',
-                    name: 'image.jpg',
-                    path: `${directoryPath}/image.jpg`,
-                    isDirectory: false,
-                    parentDirectory: directoryPath,
-                    size: 204800,
-                    modified: new Date(),
-                    type: 'image/jpeg'
-                }
-            ];
-            
-            fileTreeData = mockFiles;
-            renderFileTree(mockFiles);
+        function updateFileTree() {
+            renderFileTree(fileTreeData);
             
             document.querySelectorAll('#fileTree li').forEach(li => {
                 li.addEventListener('click', (e) => {
@@ -594,19 +585,7 @@
                     currentFile = fileTreeData.find(f => f.id === fileId);
                     
                     if (currentFile) {
-                        if (currentFile.isDirectory) {
-                            updateFileTree(currentFile.path);
-                        } else {
-                            if (isTextFile(currentFile)) {
-                                showTextContent(`Content of ${currentFile.name}\n\nThis would show the actual file content in a real application.`);
-                            } else if (isImageFile(currentFile)) {
-                                showImage('https://via.placeholder.com/600x400?text=' + encodeURIComponent(currentFile.name));
-                            } else if (isVideoFile(currentFile)) {
-                                showVideo(currentFile.path);
-                            } else {
-                                showTextContent(`Binary file: ${currentFile.name}\nSize: ${currentFile.size} bytes`);
-                            }
-                        }
+                        openFile(currentFile);
                     }
                 });
             });
@@ -623,49 +602,56 @@
             
             const ul = document.createElement('ul');
             
-            files.forEach(file => {
-                const li = document.createElement('li');
-                li.setAttribute('data-file-id', file.id);
-                
-                const icon = document.createElement('span');
-                icon.style.marginRight = '8px';
-                
-                if (file.isDirectory) {
-                    icon.textContent = '📁';
-                } else if (isImageFile(file)) {
-                    icon.textContent = '🖼️';
-                } else if (isVideoFile(file)) {
-                    icon.textContent = '🎬';
-                } else if (isArchiveFile(file)) {
-                    icon.textContent = '🗄️';
-                } else {
-                    icon.textContent = '📄';
-                }
-                
-                li.appendChild(icon);
-                li.appendChild(document.createTextNode(file.name));
-                ul.appendChild(li);
-            });
+            const renderItems = (items, parentUl) => {
+                items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.setAttribute('data-file-id', item.id);
+                    
+                    const icon = document.createElement('span');
+                    icon.style.marginRight = '8px';
+                    
+                    if (item.isDirectory) {
+                        icon.textContent = '📁';
+                    } else if (isImageFile(item)) {
+                        icon.textContent = '🖼️';
+                    } else if (isVideoFile(item)) {
+                        icon.textContent = '🎬';
+                    } else if (isArchiveFile(item)) {
+                        icon.textContent = '🗄️';
+                    } else {
+                        icon.textContent = '📄';
+                    }
+                    
+                    li.appendChild(icon);
+                    li.appendChild(document.createTextNode(item.name));
+                    
+                    if (item.children && item.children.length > 0) {
+                        const childUl = document.createElement('ul');
+                        renderItems(item.children, childUl);
+                        li.appendChild(childUl);
+                    }
+                    
+                    parentUl.appendChild(li);
+                });
+            };
             
+            renderItems(files, ul);
             fileTree.appendChild(ul);
         }
         
         function showFileProperties(file) {
             const propertiesText = `
                 Name: ${file.name}
-                Path: ${file.path}
                 Size: ${formatFileSize(file.size)}
                 Type: ${getFileType(file)}
-                Modified: ${file.modified.toLocaleString()}
-                Readable: Yes
-                Writable: Yes
-                Executable: ${file.isDirectory ? 'N/A' : 'No'}
+                Modified: ${new Date(file.lastModified).toLocaleString()}
             `;
             
             alert('File Properties:\n\n' + propertiesText);
         }
         
         function formatFileSize(bytes) {
+            if (!bytes) return '0 bytes';
             if (bytes < 1024) return bytes + ' bytes';
             const sizes = ['KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(1024));
@@ -677,7 +663,8 @@
             if (file.type) {
                 if (file.type.startsWith('image/')) return 'Image';
                 if (file.type.startsWith('video/')) return 'Video';
-                if (file.type === 'text/plain') return 'Text Document';
+                if (file.type.startsWith('text/')) return 'Text Document';
+                if (isArchiveFile(file)) return 'Archive';
             }
             return 'File';
         }
@@ -698,7 +685,7 @@
                    name.endsWith('.xml') || name.endsWith('.json') || 
                    name.endsWith('.html') || name.endsWith('.css') || 
                    name.endsWith('.js') || name.endsWith('.cpp') || 
-                   name.endsWith('.hpp');
+                   name.endsWith('.hpp') || (file.type && file.type.startsWith('text/'));
         }
         
         function isImageFile(file) {
@@ -706,7 +693,7 @@
             const name = file.name.toLowerCase();
             return name.endsWith('.jpg') || name.endsWith('.jpeg') || 
                    name.endsWith('.png') || name.endsWith('.gif') || 
-                   name.endsWith('.bmp');
+                   name.endsWith('.bmp') || (file.type && file.type.startsWith('image/'));
         }
         
         function isVideoFile(file) {
@@ -714,7 +701,7 @@
             const name = file.name.toLowerCase();
             return name.endsWith('.mp4') || name.endsWith('.avi') || 
                    name.endsWith('.mov') || name.endsWith('.mkv') || 
-                   name.endsWith('.wmv');
+                   name.endsWith('.wmv') || (file.type && file.type.startsWith('video/'));
         }
     </script>
 </body>
