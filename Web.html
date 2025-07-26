@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExArchive</title>
+    <style>
+        :root {
+            --primary-color: #303f9f;
+            --secondary-color: #ffffff;
+            --background-color: #fafafc;
+            --accent-color: #eceff1;
+            --text-color: #212121;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+        
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .toolbar {
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .toolbar-button {
+            background-color: transparent;
+            color: var(--secondary-color);
+            border: none;
+            padding: 8px 20px;
+            margin: 0 5px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        .toolbar-button:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+        
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .tree-panel {
+            width: 350px;
+            background-color: var(--secondary-color);
+            border-right: 1px solid var(--accent-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .content-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .content-area {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+            background-color: var(--secondary-color);
+        }
+        
+        .image-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: auto;
+            background-color: var(--accent-color);
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-controls {
+            padding: 10px;
+            background-color: var(--accent-color);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .control-button {
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            border: 1px solid #e0e0e0;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        #fileTree {
+            flex: 1;
+            overflow: auto;
+            padding: 10px;
+            background-color: var(--secondary-color);
+            border: none;
+        }
+        
+        #fileTree ul {
+            list-style-type: none;
+            padding-left: 20px;
+        }
+        
+        #fileTree li {
+            padding: 5px 0;
+            cursor: pointer;
+        }
+        
+        #fileTree li:hover {
+            background-color: var(--accent-color);
+        }
+        
+        #fileTree li.selected {
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+        }
+        
+        .footer {
+            background-color: var(--background-color);
+            border-top: 1px solid var(--accent-color);
+            padding: 10px;
+            text-align: center;
+            font-size: 12px;
+        }
+        
+        #statusBar {
+            padding: 5px 15px;
+            font-size: 12px;
+            font-weight: bold;
+            background-color: var(--background-color);
+        }
+        
+        #contentText {
+            width: 100%;
+            height: 100%;
+            border: none;
+            resize: none;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 14px;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+        }
+        
+        #imageDisplay {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        
+        .developers-panel {
+            padding: 20px;
+            background-color: var(--secondary-color);
+            text-align: center;
+        }
+        
+        .developer-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 30px;
+        }
+        
+        .developer-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .developer-link:hover {
+            text-decoration: underline;
+        }
+        
+        .context-menu {
+            position: absolute;
+            background-color: var(--secondary-color);
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+        
+        .context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+        
+        .context-menu-item:hover {
+            background-color: var(--accent-color);
+        }
+        
+        .context-menu-separator {
+            height: 1px;
+            background-color: #e0e0e0;
+            margin: 5px 0;
+        }
+        
+        #startupPanel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        
+        #startupContent {
+            background-color: var(--secondary-color);
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        #startupButtons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .startup-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        #downloadBtn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        #closeBtn {
+            background-color: #e0e0e0;
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+    <div id="startupPanel">
+        <div id="startupContent">
+            <h2>Welcome to ExArchive</h2>
+            <p>Please install the full version for complete functionality.</p>
+            <div id="startupButtons">
+                <button class="startup-button" id="downloadBtn">Download</button>
+                <button class="startup-button" id="closeBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" style="display: none;">
+        <div class="toolbar">
+            <button class="toolbar-button" id="openBtn">Open</button>
+            <button class="toolbar-button" id="extractBtn">Extract</button>
+            <button class="toolbar-button" id="devBtn">Developers</button>
+        </div>
+        
+        <div class="main-content">
+            <div class="tree-panel">
+                <div id="fileTree"></div>
+            </div>
+            
+            <div class="content-panel">
+                <div id="contentArea" class="content-area">
+                    <textarea id="contentText" readonly></textarea>
+                </div>
+                
+                <div id="imageArea" class="image-container" style="display: none;">
+                    <img id="imageDisplay">
+                    <div class="image-controls">
+                        <button class="control-button" id="zoomOutBtn">-</button>
+                        <button class="control-button" id="resetZoomBtn">Reset Zoom</button>
+                        <button class="control-button" id="zoomInBtn">+</button>
+                    </div>
+                </div>
+                
+                <div id="videoArea" class="content-area" style="display: none;">
+                    <div id="videoContainer"></div>
+                </div>
+                
+                <div id="developersArea" class="developers-panel" style="display: none;">
+                    <div class="developer-title">Developers ExArchive 2.0.0</div>
+                    <div>
+                        <span>Creator/Developer: </span>
+                        <a class="developer-link" href="https://github.com/Artik9nx" target="_blank">Art1kDev</a>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <span>Assistant: </span>
+                        <a class="developer-link" href="https://t.me/fungamesstudio" target="_blank">Mezoik</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="statusBar">Ready</div>
+        <div class="footer">ExArchive 2025 2.0.1</div>
+    </div>
+    
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item" id="openContextItem">Open</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="deleteContextItem">Delete</div>
+        <div class="context-menu-item" id="renameContextItem">Rename</div>
+        <div class="context-menu-item" id="copyPathContextItem">Copy Path</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" id="propertiesContextItem">Properties</div>
+    </div>
+    
+    <script>
+        let currentFile = null;
+        let currentScale = 1.0;
+        let fileTreeData = [];
+        let selectedTreeNode = null;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const startupPanel = document.getElementById('startupPanel');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const closeBtn = document.getElementById('closeBtn');
+            
+            downloadBtn.addEventListener('click', () => {
+                window.open('index.html', '_blank');
+            });
+            
+            closeBtn.addEventListener('click', () => {
+                startupPanel.style.display = 'none';
+                document.getElementById('app').style.display = 'flex';
+            });
+            
+            const openBtn = document.getElementById('openBtn');
+            const extractBtn = document.getElementById('extractBtn');
+            const devBtn = document.getElementById('devBtn');
+            const zoomInBtn = document.getElementById('zoomInBtn');
+            const zoomOutBtn = document.getElementById('zoomOutBtn');
+            const resetZoomBtn = document.getElementById('resetZoomBtn');
+            const contentText = document.getElementById('contentText');
+            const imageDisplay = document.getElementById('imageDisplay');
+            const statusBar = document.getElementById('statusBar');
+            const fileTree = document.getElementById('fileTree');
+            
+            const contextMenu = document.getElementById('contextMenu');
+            const openContextItem = document.getElementById('openContextItem');
+            const deleteContextItem = document.getElementById('deleteContextItem');
+            const renameContextItem = document.getElementById('renameContextItem');
+            const copyPathContextItem = document.getElementById('copyPathContextItem');
+            const propertiesContextItem = document.getElementById('propertiesContextItem');
+            
+            openBtn.addEventListener('click', handleOpenFile);
+            extractBtn.addEventListener('click', handleExtractFile);
+            devBtn.addEventListener('click', showDevelopersPanel);
+            zoomInBtn.addEventListener('click', () => zoomImage(1.25));
+            zoomOutBtn.addEventListener('click', () => zoomImage(0.8));
+            resetZoomBtn.addEventListener('click', resetZoom);
+            
+            openContextItem.addEventListener('click', () => {
+                if (currentFile) {
+                    window.open(currentFile.path, '_blank');
+                }
+                contextMenu.style.display = 'none';
+            });
+            
+            deleteContextItem.addEventListener('click', () => {
+                if (currentFile) {
+                    const confirmDelete = confirm(`Are you sure you want to delete "${currentFile.name}"?`);
+                    if (confirmDelete) {
+                        statusBar.textContent = `File deleted: ${currentFile.name}`;
+                        updateFileTree(currentFile.parentDirectory);
+                    }
+                }
+                contextMenu.style.display = 'none';
+            });
+            
+            renameContextItem.addEventListener('click', () => {
+                if (currentFile) {
+                    const newName = prompt('Enter new name:', currentFile.name);
+                    if (newName && newName.trim() !== '') {
+                        statusBar.textContent = `File renamed to: ${newName}`;
+                        updateFileTree(currentFile.parentDirectory);
+                    }
+                }
+                contextMenu.style.display = 'none';
+            });
+            
+            copyPathContextItem.addEventListener('click', () => {
+                if (currentFile) {
+                    navigator.clipboard.writeText(currentFile.path)
+                        .then(() => {
+                            statusBar.textContent = 'Path copied to clipboard';
+                        })
+                        .catch(err => {
+                            statusBar.textContent = 'Failed to copy path';
+                        });
+                }
+                contextMenu.style.display = 'none';
+            });
+            
+            propertiesContextItem.addEventListener('click', () => {
+                if (currentFile) {
+                    showFileProperties(currentFile);
+                }
+                contextMenu.style.display = 'none';
+            });
+            
+            fileTree.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                const li = e.target.closest('li');
+                if (li) {
+                    selectedTreeNode = li;
+                    const fileId = li.getAttribute('data-file-id');
+                    currentFile = fileTreeData.find(f => f.id === fileId);
+                    
+                    contextMenu.style.display = 'block';
+                    contextMenu.style.left = `${e.pageX}px`;
+                    contextMenu.style.top = `${e.pageY}px`;
+                }
+            });
+            
+            document.addEventListener('click', () => {
+                contextMenu.style.display = 'none';
+            });
+            
+            renderFileTree([]);
+        });
+        
+        function handleOpenFile() {
+            const mockFile = {
+                id: 'file1',
+                name: 'example.txt',
+                path: '/path/to/example.txt',
+                isDirectory: false,
+                parentDirectory: '/path/to',
+                size: 1024,
+                modified: new Date(),
+                type: 'text/plain'
+            };
+            
+            currentFile = mockFile;
+            updateFileTree('/path/to');
+            statusBar.textContent = `Opened: ${mockFile.name}`;
+            
+            if (isTextFile(mockFile)) {
+                showTextContent('This is example text content.\n\nYou would see the actual file content here in a real application.');
+            } else if (isImageFile(mockFile)) {
+                showImage('https://via.placeholder.com/600x400?text=Example+Image');
+            } else if (isVideoFile(mockFile)) {
+                showVideo('/path/to/example.mp4');
+            } else {
+                showTextContent(`Binary file: ${mockFile.name}\nSize: ${mockFile.size} bytes`);
+            }
+        }
+        
+        function handleExtractFile() {
+            if (!currentFile || !isArchiveFile(currentFile)) {
+                statusBar.textContent = 'Please select an archive file to extract';
+                return;
+            }
+            
+            statusBar.textContent = `Extracted ${currentFile.name} to selected directory`;
+        }
+        
+        function showDevelopersPanel() {
+            document.getElementById('contentArea').style.display = 'none';
+            document.getElementById('imageArea').style.display = 'none';
+            document.getElementById('videoArea').style.display = 'none';
+            document.getElementById('developersArea').style.display = 'block';
+        }
+        
+        function showTextContent(content) {
+            document.getElementById('contentText').value = content;
+            document.getElementById('contentArea').style.display = 'block';
+            document.getElementById('imageArea').style.display = 'none';
+            document.getElementById('videoArea').style.display = 'none';
+            document.getElementById('developersArea').style.display = 'none';
+        }
+        
+        function showImage(imageSrc) {
+            const imageDisplay = document.getElementById('imageDisplay');
+            imageDisplay.src = imageSrc;
+            currentScale = 1.0;
+            imageDisplay.style.transform = `scale(${currentScale})`;
+            
+            document.getElementById('contentArea').style.display = 'none';
+            document.getElementById('imageArea').style.display = 'flex';
+            document.getElementById('videoArea').style.display = 'none';
+            document.getElementById('developersArea').style.display = 'none';
+        }
+        
+        function showVideo(videoSrc) {
+            const videoContainer = document.getElementById('videoContainer');
+            videoContainer.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    Playing: ${currentFile ? currentFile.name : 'video'}
+                </div>
+                <div style="text-align: center;">
+                    <button onclick="playVideo('${videoSrc}')" style="padding: 10px 20px; background-color: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Play Video
+                    </button>
+                </div>
+                <div style="text-align: center; margin-top: 20px; color: #666;">
+                    Note: This demo would play the video in a real application
+                </div>
+            `;
+            
+            document.getElementById('contentArea').style.display = 'none';
+            document.getElementById('imageArea').style.display = 'none';
+            document.getElementById('videoArea').style.display = 'block';
+            document.getElementById('developersArea').style.display = 'none';
+        }
+        
+        function playVideo(videoSrc) {
+            alert(`Would play video: ${videoSrc}\nIn a real app, this would open the video player.`);
+        }
+        
+        function zoomImage(factor) {
+            currentScale *= factor;
+            document.getElementById('imageDisplay').style.transform = `scale(${currentScale})`;
+        }
+        
+        function resetZoom() {
+            currentScale = 1.0;
+            document.getElementById('imageDisplay').style.transform = `scale(${currentScale})`;
+        }
+        
+        function updateFileTree(directoryPath) {
+            const mockFiles = [
+                {
+                    id: 'file1',
+                    name: 'Documents',
+                    path: `${directoryPath}/Documents`,
+                    isDirectory: true,
+                    parentDirectory: directoryPath,
+                    size: 0,
+                    modified: new Date(),
+                    type: 'directory'
+                },
+                {
+                    id: 'file2',
+                    name: 'example.txt',
+                    path: `${directoryPath}/example.txt`,
+                    isDirectory: false,
+                    parentDirectory: directoryPath,
+                    size: 1024,
+                    modified: new Date(),
+                    type: 'text/plain'
+                },
+                {
+                    id: 'file3',
+                    name: 'image.jpg',
+                    path: `${directoryPath}/image.jpg`,
+                    isDirectory: false,
+                    parentDirectory: directoryPath,
+                    size: 204800,
+                    modified: new Date(),
+                    type: 'image/jpeg'
+                }
+            ];
+            
+            fileTreeData = mockFiles;
+            renderFileTree(mockFiles);
+            
+            document.querySelectorAll('#fileTree li').forEach(li => {
+                li.addEventListener('click', (e) => {
+                    document.querySelectorAll('#fileTree li').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    
+                    li.classList.add('selected');
+                    
+                    const fileId = li.getAttribute('data-file-id');
+                    currentFile = fileTreeData.find(f => f.id === fileId);
+                    
+                    if (currentFile) {
+                        if (currentFile.isDirectory) {
+                            updateFileTree(currentFile.path);
+                        } else {
+                            if (isTextFile(currentFile)) {
+                                showTextContent(`Content of ${currentFile.name}\n\nThis would show the actual file content in a real application.`);
+                            } else if (isImageFile(currentFile)) {
+                                showImage('https://via.placeholder.com/600x400?text=' + encodeURIComponent(currentFile.name));
+                            } else if (isVideoFile(currentFile)) {
+                                showVideo(currentFile.path);
+                            } else {
+                                showTextContent(`Binary file: ${currentFile.name}\nSize: ${currentFile.size} bytes`);
+                            }
+                        }
+                    }
+                });
+            });
+        }
+        
+        function renderFileTree(files) {
+            const fileTree = document.getElementById('fileTree');
+            fileTree.innerHTML = '';
+            
+            if (files.length === 0) {
+                fileTree.innerHTML = '<div style="padding: 10px; color: #666;">No files</div>';
+                return;
+            }
+            
+            const ul = document.createElement('ul');
+            
+            files.forEach(file => {
+                const li = document.createElement('li');
+                li.setAttribute('data-file-id', file.id);
+                
+                const icon = document.createElement('span');
+                icon.style.marginRight = '8px';
+                
+                if (file.isDirectory) {
+                    icon.textContent = '📁';
+                } else if (isImageFile(file)) {
+                    icon.textContent = '🖼️';
+                } else if (isVideoFile(file)) {
+                    icon.textContent = '🎬';
+                } else if (isArchiveFile(file)) {
+                    icon.textContent = '🗄️';
+                } else {
+                    icon.textContent = '📄';
+                }
+                
+                li.appendChild(icon);
+                li.appendChild(document.createTextNode(file.name));
+                ul.appendChild(li);
+            });
+            
+            fileTree.appendChild(ul);
+        }
+        
+        function showFileProperties(file) {
+            const propertiesText = `
+                Name: ${file.name}
+                Path: ${file.path}
+                Size: ${formatFileSize(file.size)}
+                Type: ${getFileType(file)}
+                Modified: ${file.modified.toLocaleString()}
+                Readable: Yes
+                Writable: Yes
+                Executable: ${file.isDirectory ? 'N/A' : 'No'}
+            `;
+            
+            alert('File Properties:\n\n' + propertiesText);
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' bytes';
+            const sizes = ['KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i-1];
+        }
+        
+        function getFileType(file) {
+            if (file.isDirectory) return 'Folder';
+            if (file.type) {
+                if (file.type.startsWith('image/')) return 'Image';
+                if (file.type.startsWith('video/')) return 'Video';
+                if (file.type === 'text/plain') return 'Text Document';
+            }
+            return 'File';
+        }
+        
+        function isArchiveFile(file) {
+            if (!file.name) return false;
+            const name = file.name.toLowerCase();
+            return name.endsWith('.zip') || name.endsWith('.rar') || 
+                   name.endsWith('.7z') || name.endsWith('.tar.gz') || 
+                   name.endsWith('.tar.bz2') || name.endsWith('.jar') || 
+                   name.endsWith('.apk') || name.endsWith('.exe');
+        }
+        
+        function isTextFile(file) {
+            if (!file.name) return false;
+            const name = file.name.toLowerCase();
+            return name.endsWith('.txt') || name.endsWith('.java') || 
+                   name.endsWith('.xml') || name.endsWith('.json') || 
+                   name.endsWith('.html') || name.endsWith('.css') || 
+                   name.endsWith('.js') || name.endsWith('.cpp') || 
+                   name.endsWith('.hpp');
+        }
+        
+        function isImageFile(file) {
+            if (!file.name) return false;
+            const name = file.name.toLowerCase();
+            return name.endsWith('.jpg') || name.endsWith('.jpeg') || 
+                   name.endsWith('.png') || name.endsWith('.gif') || 
+                   name.endsWith('.bmp');
+        }
+        
+        function isVideoFile(file) {
+            if (!file.name) return false;
+            const name = file.name.toLowerCase();
+            return name.endsWith('.mp4') || name.endsWith('.avi') || 
+                   name.endsWith('.mov') || name.endsWith('.mkv') || 
+                   name.endsWith('.wmv');
+        }
+    </script>
+</body>
+</html>
